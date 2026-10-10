@@ -2,7 +2,8 @@
 const express = require("express");
 const db = require("./db");
 const bcrypt = require("bcrypt");
-const crypto = require("crypto")
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken")
 
 const PORT = process.env.PORT;
 const app = express();
@@ -39,26 +40,25 @@ app.post("/api/v1/auth/register", async (req, res) => {
     const { first_name, last_name, email, password } = req.body;
 
     if (
-            typeof first_name !== 'string' ||
-            typeof last_name !== 'string' ||
-            typeof email !== 'string' ||
-            typeof password !== 'string'
-        ) {
-            return res.status(400).json({
-                message: 'Invalid input, check email or password entry!'
-            });
-        }
-// clean the provided email
+      typeof first_name !== "string" ||
+      typeof last_name !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
+      return res.status(400).json({
+        message: "Invalid input, check email or password entry!",
+      });
+    }
+    // clean the provided email
 
     const cleanedEmail = email.trim().toLowerCase();
 
-// checking for required fields
-if (!first_name.trim() || !last_name.trim() || !cleanedEmail || !password) {
-            return res.status(400).json({
-                message: 'All fields are required.'
-            });
-        }
-
+    // checking for required fields
+    if (!first_name.trim() || !last_name.trim() || !cleanedEmail || !password) {
+      return res.status(400).json({
+        message: "All fields are required.",
+      });
+    }
 
     if (!cleanedEmail.includes("@")) {
       return res.status(400).json({
@@ -97,18 +97,17 @@ if (!first_name.trim() || !last_name.trim() || !cleanedEmail || !password) {
       cleanedEmail,
       password_hash,
       tokenHash,
-      tokenExpiresAt
+      tokenExpiresAt,
     ];
 
     const result = await db.query(insertQuery, values);
     const newUser = result.rows[0];
 
-
     // Log the verification url
     const verificationUrl = `${process.env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`;
-    console.log('EMAIL VERIFICATION LINK (Terminal Test Only):');
+    console.log("EMAIL VERIFICATION LINK (Terminal Test Only):");
     console.log(verificationUrl);
-    console.log('----------------------------------------------------');
+    console.log("----------------------------------------------------");
 
     return res.status(201).json({
       message: "User registered successfully!",
@@ -126,24 +125,23 @@ if (!first_name.trim() || !last_name.trim() || !cleanedEmail || !password) {
   }
 });
 
-
 // verifying email token
 
-app.get('/api/v1/auth/verify-email', async (req, res) => {
+app.get("/api/v1/auth/verify-email", async (req, res) => {
   try {
-      const { token } = req.query;
+    const { token } = req.query;
 
     // checking if token is a valid string and exists
 
-      if (!token || typeof token !== 'string') {
-        return res.status(400).json({
-          message: "Invalid request. Verification token is required!"
-        });
-      }
-    
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({
+        message: "Invalid request. Verification token is required!",
+      });
+    }
+
     // now I going to hash the incoming token using SHA 256
 
-      const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
     // I'll look up the hash in our database and also update is_verified if we find something
 
@@ -157,36 +155,37 @@ app.get('/api/v1/auth/verify-email', async (req, res) => {
             AND email_verification_expires_at > NOW() 
           RETURNING id, email;  
       `;
-    const result = await db.query(verificationQuery,[tokenHash])
+    const result = await db.query(verificationQuery, [tokenHash]);
 
     if (result.rows.length === 0) {
-        return res.status(400).json({
-          message: "Invalid or expired link."
-        });
-      }
+      return res.status(400).json({
+        message: "Invalid or expired link.",
+      });
+    }
 
     return res.status(200).json({
-            message: 'Email verified successfully! You can now log in.'
-        });
-
+      message: "Email verified successfully! You can now log in.",
+    });
   } catch (err) {
-    console.error("Email verification error:", err)
+    console.error("Email verification error:", err);
     return res.status(500).json({
-      message: "Internal server error"
+      message: "Internal server error",
     });
   }
 });
-
-
-
-
-
 
 // Login route
 
 app.post("/api/v1/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // check for strings
+    if (typeof email == !"string" || typeof password == !"string") {
+      return res.status(400).json({
+        message: "Invalid input in email or password",
+      });
+    }
 
     // check if required fields are present
     if (!email || !email.trim() || !password) {
@@ -223,17 +222,26 @@ app.post("/api/v1/auth/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password!" });
     }
 
-
     // check account verification
 
     if (!user.is_verified) {
       return res.status(403).json({
-        message: "Please verify your email before logging in."
-      })
+        message: "Please verify your email before logging in.",
+      });
     }
 
+    // Generate jwt 
+
+    const token = jwt.sign(
+          {id: user.id, role: user.user_role},
+          process.env.JWT_SECRET,
+          {expiresIn: process.env.JWT_EXPIRES_IN || '1h'}
+    );
+
+
     return res.status(200).json({
-      message: " User successfully logged in!",
+      message: "User successfully logged in!",
+      token,
       user: {
         firstName: user.first_name,
         lastName: user.last_name,
