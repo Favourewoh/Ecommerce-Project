@@ -3,7 +3,8 @@ const express = require("express");
 const db = require("./db");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
-const jwt = require("jsonwebtoken")
+const jwt = require("jsonwebtoken");
+const authenticateToken = require("./middleware/auth");
 
 const PORT = process.env.PORT;
 const app = express();
@@ -255,6 +256,22 @@ app.post("/api/v1/auth/login", async (req, res) => {
     return res.status(500).json({ message: "Internal server error." });
   }
 });
+
+
+// let's route the dashboard
+
+app.get("/api/v1/dashboard", authenticateToken, (req, res) => {
+  try {
+    res.send("Hello world, Dashboard is working!");
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    return res.status(500).json({ message: 'Internal server error.' });
+  }
+});
+
+
+
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port 3000`);
