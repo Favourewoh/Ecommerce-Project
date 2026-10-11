@@ -261,12 +261,8 @@ app.post("/api/v1/auth/login", async (req, res) => {
 // let's route the dashboard
 
 app.get("/api/v1/dashboard", authenticateToken, (req, res) => {
-  try {
-    res.send("Hello world, Dashboard is working!");
-  } catch (error) {
-    console.error('Error fetching profile:', error);
-    return res.status(500).json({ message: 'Internal server error.' });
-  }
+  
+    res.status(200).json({ message: "Hello world, Dashboard is working!"});
 });
 
 
