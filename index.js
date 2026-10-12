@@ -232,14 +232,13 @@ app.post("/api/v1/auth/login", async (req, res) => {
       });
     }
 
-    // Generate jwt 
+    // Generate jwt
 
     const token = jwt.sign(
-          {id: user.id, role: user.user_role},
-          process.env.JWT_SECRET,
-          {expiresIn: process.env.JWT_EXPIRES_IN || '1h'}
+      { id: user.id, role: user.user_role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "1h" },
     );
-
 
     return res.status(200).json({
       message: "User successfully logged in!",
@@ -258,106 +257,168 @@ app.post("/api/v1/auth/login", async (req, res) => {
   }
 });
 
-
 // let's route the dashboard
 
 // Merchant and admin accessible route
-app.get("/api/v1/dashboard", authenticateToken, authorizeRoles('merchant','admin'), (req, res) => {
-  
-    res.status(200).json({ 
+app.get(
+  "/api/v1/dashboard",
+  authenticateToken,
+  authorizeRoles("merchant", "admin"),
+  (req, res) => {
+    res.status(200).json({
       message: `Welcome to the dashboard, User #${req.user.id}`,
-      Role: req.user.role
+      Role: req.user.role,
     });
-});
-
+  },
+);
 
 // Admin only dashboard
-app.get("/api/v1/admin/dashboard", authenticateToken, authorizeRoles('admin'), (req, res) => {
-  
-    res.status(200).json({ 
+app.get(
+  "/api/v1/admin/dashboard",
+  authenticateToken,
+  authorizeRoles("admin"),
+  (req, res) => {
+    res.status(200).json({
       message: `Welcome to the Admin Control Panel`,
-      Role: req.user.role
+      Role: req.user.role,
     });
-});
-
+  },
+);
 
 // Forgot password endpoint
-app.post('/api/v1/auth/forgot-password', async (req, res) => {
+app.post("/api/v1/auth/forgot-password", async (req, res) => {
   try {
-    const { email } = req.body
+    const { email } = req.body;
 
     // validating email input type and presence
-    if(typeof email ==! 'string') {
+    if (typeof email !== "string") {
       return res.status(400).json({
-        message: "Invalid input. Email must be text string"
+        message: "Invalid input. Email must be text string",
       });
-
-      
     }
 
-    const cleanedEmail = email.trim().toLowerCase()
+    const cleanedEmail = email.trim().toLowerCase();
 
     if (!cleanedEmail) {
-      res.status(400).json({
-        message: "Email is required!"
+      return res.status(400).json({
+        message: "Email is required!",
       });
     }
-
 
     // look up user in the database
 
-    const userQuery = `SELECT * FROM users WHERE email = $1;`
+    const userQuery = `SELECT id FROM users WHERE email = $1;`;
     const result = await db.query(userQuery, [cleanedEmail]);
     const genericReponseMessage = {
-        message: "If an account with that email exists, a reset link has been sent"
+      message:
+        "If an account with that email exists, a reset link has been sent",
     };
 
     // if the user doesn't exist
 
-    if( result.rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(200).json(genericReponseMessage);
     }
 
     const user = result.rows[0];
 
     // generate random token and hash
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-
-    // set expiry
-    const expiresAt = Date(Date() + 60 * 60 * 1000);
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
 
     // saving the hash and expiry to db in the same query
     const updateQuery = `
         UPDATE users
           SET password_reset_token_hash = $1,
-              password_reset_expires_at = $2,
+              password_reset_expires_at = NOW() + INTERVAL '30 minutes',
               updated_at = NOW()
-          WHERE id = $3 
+          WHERE id = $2
     `;
-    await db.query(updateQuery, [tokenHash, expiresAt, user.id]);
+    await db.query(updateQuery, [tokenHash, user.id]);
 
-    //Printing reset link to terminal for testing 
-        const appUrl = process.env.APP_URL;
-        const resetUrl = `${appUrl}/api/v1/auth/reset-password?token=${rawToken}`;
-        
-        console.log(resetUrl);
-        
+    //Printing reset link to terminal for testing
+    const appUrl = process.env.APP_URL;
+    const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
+
+    console.log(resetUrl);
 
     return res.status(200).json(genericReponseMessage);
-
-
-
   } catch (err) {
-    console.error('Forgot password error:', err)
+    console.error("Forgot password error:", err);
     return res.status(500).json({
-      message: "Internal server error"
+      message: "Internal server error",
     });
   }
-  
-})
+});
 
+// Reset password endpoint
 
+app.post("/api/v1/auth/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    // confirm data type and presence
+    if (typeof token !== "string" || typeof newPassword !== "string") {
+      return res.status(400).json({
+        message: "Invalid input. Token and Password must be text strings",
+      });
+    }
+
+    if (!token.trim() || !newPassword.trim()) {
+      return res.status(400).json({
+        message: "Token and new password are required.",
+      });
+    }
+
+    // enforcing password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters long.",
+      });
+    }
+
+    // hashing the incoming token
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(token.trim())
+      .digest("hex");
+
+    // hashing the new password
+    const hashNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the database
+    const resetQuery = `
+      UPDATE users
+        SET password_hash = $1,
+            password_reset_token_hash = NULL,
+            password_reset_expires_at = NULL,
+            updated_at = NOW()
+        WHERE password_reset_token_hash = $2
+          AND password_reset_expires_at > NOW()
+        RETURNING id, email;
+   `;
+    const result = await db.query(resetQuery, [hashNewPassword, tokenHash]);
+
+    // token is invalid if no row is updated
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        message: "Invalid or expired password reset token",
+      });
+    }
+
+    // Success
+    return res.status(200).json({
+      message:
+        "Password has been successfully reset. You can now log in with your new password.",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port 3000`);
