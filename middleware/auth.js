@@ -19,7 +19,7 @@ const authenticateToken = (req, res, next) => {
 
     if (!token) {
       return res.status(401).json({
-        message: "Accessed denied. Malformed authentication token",
+        message: "Access denied. Malformed authentication token",
       });
     }
 
