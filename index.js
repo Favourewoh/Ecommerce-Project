@@ -281,6 +281,81 @@ app.get("/api/v1/admin/dashboard", authenticateToken, authorizeRoles('admin'), (
 });
 
 
+// Forgot password endpoint
+app.post('/api/v1/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body
+
+    // validating email input type and presence
+    if(typeof email ==! 'string') {
+      return res.status(400).json({
+        message: "Invalid input. Email must be text string"
+      });
+
+      
+    }
+
+    const cleanedEmail = email.trim().toLowerCase()
+
+    if (!cleanedEmail) {
+      res.status(400).json({
+        message: "Email is required!"
+      });
+    }
+
+
+    // look up user in the database
+
+    const userQuery = `SELECT * FROM users WHERE email = $1;`
+    const result = await db.query(userQuery, [cleanedEmail]);
+    const genericReponseMessage = {
+        message: "If an account with that email exists, a reset link has been sent"
+    };
+
+    // if the user doesn't exist
+
+    if( result.rows.length === 0) {
+      return res.status(200).json(genericReponseMessage);
+    }
+
+    const user = result.rows[0];
+
+    // generate random token and hash
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    // set expiry
+    const expiresAt = Date(Date() + 60 * 60 * 1000);
+
+    // saving the hash and expiry to db in the same query
+    const updateQuery = `
+        UPDATE users
+          SET password_reset_token_hash = $1,
+              password_reset_expires_at = $2,
+              updated_at = NOW()
+          WHERE id = $3 
+    `;
+    await db.query(updateQuery, [tokenHash, expiresAt, user.id]);
+
+    //Printing reset link to terminal for testing 
+        const appUrl = process.env.APP_URL;
+        const resetUrl = `${appUrl}/api/v1/auth/reset-password?token=${rawToken}`;
+        
+        console.log(resetUrl);
+        
+
+    return res.status(200).json(genericReponseMessage);
+
+
+
+  } catch (err) {
+    console.error('Forgot password error:', err)
+    return res.status(500).json({
+      message: "Internal server error"
+    });
+  }
+  
+})
 
 
 
