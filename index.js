@@ -305,23 +305,13 @@ app.post("/api/v1/auth/forgot-password", async (req, res) => {
       });
     }
 
-    // look up user in the database
-
-    const userQuery = `SELECT id FROM users WHERE email = $1;`;
-    const result = await db.query(userQuery, [cleanedEmail]);
+    // create message for feedback
     const genericReponseMessage = {
       message:
         "If an account with that email exists, a reset link has been sent",
     };
 
-    // if the user doesn't exist
-
-    if (result.rows.length === 0) {
-      return res.status(200).json(genericReponseMessage);
-    }
-
-    const user = result.rows[0];
-
+    
     // generate random token and hash
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto
@@ -335,9 +325,16 @@ app.post("/api/v1/auth/forgot-password", async (req, res) => {
           SET password_reset_token_hash = $1,
               password_reset_expires_at = NOW() + INTERVAL '30 minutes',
               updated_at = NOW()
-          WHERE id = $2
+          WHERE LOWER (email)  = $2
+        RETURNING id
     `;
-    await db.query(updateQuery, [tokenHash, user.id]);
+    const result = await db.query(updateQuery, [tokenHash, cleanedEmail]);
+
+    // if the user doesn't exist, no row updated
+
+    if (result.rows.length === 0) {
+      return res.status(200).json(genericReponseMessage);
+    }
 
     //Printing reset link to terminal for testing
     const appUrl = process.env.APP_URL;
