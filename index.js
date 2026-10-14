@@ -6,8 +6,20 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
-
 const PORT = process.env.PORT;
+const adminSecretKey = process.env.ADMIN_SECRET_KEY
+const jwtSecret = process.env.JWT_SECRET
+
+// CRITICAL BOOT CHECKS
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error("JWT secret is missing or too short")
+}
+if (!adminSecretKey || adminSecretKey.length < 32) {
+  throw new Error("Admin key is missing or too short")
+}
+
+
+
 const app = express();
 
 // to parse incoming data
