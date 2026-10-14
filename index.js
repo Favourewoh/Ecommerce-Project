@@ -6,7 +6,9 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
+const { type } = require("os");
 const PORT = process.env.PORT;
+const app = express();
 const adminSecretKey = process.env.ADMIN_SECRET_KEY
 const jwtSecret = process.env.JWT_SECRET
 
@@ -18,12 +20,55 @@ if (!adminSecretKey || adminSecretKey.length < 32) {
   throw new Error("Admin key is missing or too short")
 }
 
-
-
-const app = express();
+// pre-hashing admin secret key
+const prehashedAdminSecret = crypto.createHash('sha256').update(adminSecretKey).digest('hex');
 
 // to parse incoming data
 app.use(express.json());
+
+// creating re-usable helpers
+
+const validateAndSanitizeBody = (body) => {
+  if (!body ||  body !== 'object') {
+    throw new Error("Invalid request body.")
+  }
+
+  const { first_name, last_name, email, password} = req.body;
+
+  if( typeof first_name  !== 'string' || typeof last_name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+    throw new Error("All registration fields must be text strings.");
+  }
+
+  const cleanedEmail = email.trim().toLowerCase();
+
+  if (!first_name.trim() || !last_name.trim() || !cleanedEmail || !password) {
+    throw new Error("All fields are required.");
+  }
+
+  if (password < 8) {
+    throw new Error("Password must be at least 8 characters long.");
+  }
+
+  return {
+    first_name: first_name.trim(),
+    last_name: last_name.trim(),
+    email: cleanedEmail,
+    password: password
+  }
+
+};
+
+const hashPassword = async (password) => {
+  const saltRounds = 10;
+  return await bcrypt.hash(password, saltRounds);
+};
+
+const generateVerificationToken = () => {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+return { rawToken, tokenHash};
+};
+
 
 // Example route retrieving data from PostgreSQL
 app.get("/users", async (req, res) => {
