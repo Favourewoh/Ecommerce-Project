@@ -117,7 +117,7 @@ app.post('/api/v1/auth/admin-register', async (req, res) => {
 
     const newUser = result.rows[0];
 
-    // print verification link to terminal
+    // print verification link to the terminal
     const appUrl = process.env.APP_URL;
     const verifyUrl = `${appUrl}/api/v1/auth/verify-email?token=${rawToken}`;
     
