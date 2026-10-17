@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
-const { adminRegisterLimiter } = require("./middleware/limiter");
+const { RegisterLimiter } = require("./middleware/limiter");
 const PORT = process.env.PORT;
 const app = express();
 const adminSecretKey = process.env.ADMIN_SECRET_KEY
@@ -27,7 +27,6 @@ if (!adminSecretKey || adminSecretKey.length < 32) {
 const prehashedAdminSecret = crypto.createHash('sha256').update(String(adminSecretKey)).digest();
 
 // creating re-usable helpers
-
 const validateAndSanitizeBody = (body) => {
   if (!body || typeof body !== 'object') {
     const err = new Error("Invalid request body.");
@@ -104,7 +103,7 @@ return { rawToken, tokenHash};
 
 
 // admin registration route
-app.post('/api/v1/auth/admin-register', async (req, res) => {
+app.post('/api/v1/auth/admin-register', RegisterLimiter , async (req, res) => {
   try {
     const adminHeader = req.headers['x-admin-secret'];
     const uniformAuthError = {message: "Access denied. Invalid secret key."};
@@ -180,7 +179,7 @@ app.post('/api/v1/auth/admin-register', async (req, res) => {
 
 // registration route
 
-app.post("/api/v1/auth/register", async (req, res) => {
+app.post("/api/v1/auth/register", RegisterLimiter, async (req, res) => {
   try {
     const sanitizedData = validateAndSanitizeBody(req.body);
 

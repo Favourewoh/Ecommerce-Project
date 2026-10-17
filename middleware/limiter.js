@@ -1,7 +1,7 @@
 const rateLimit = require('express-rate-limit');
 
 // Admin registration limiter: 5 requests per 15 minutes per IP
-const adminRegisterLimiter = rateLimit({
+const RegisterLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 5,
     standardHeaders: true,
@@ -11,5 +11,5 @@ const adminRegisterLimiter = rateLimit({
 });
 
 module.exports = {
-    adminRegisterLimiter
+    RegisterLimiter
 };
