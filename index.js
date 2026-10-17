@@ -6,7 +6,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
-const { RegisterLimiter } = require("./middleware/limiter");
+const { RegisterLimiter, loginLimiter, forgotPasswordLimiter } = require("./middleware/limiter");
 const PORT = process.env.PORT;
 const app = express();
 const adminSecretKey = process.env.ADMIN_SECRET_KEY
@@ -14,6 +14,7 @@ const jwtSecret = process.env.JWT_SECRET
 
 // to parse incoming data
 app.use(express.json());
+app.disable("x-powered-by");
 
 // CRITICAL BOOT CHECKS
 if (!jwtSecret || jwtSecret.length < 32) {
@@ -99,22 +100,30 @@ const generateVerificationToken = () => {
 return { rawToken, tokenHash};
 };
 
+// --- TOP-LEVEL CONSTANTS ---
+const uniformAuthError = { message: "Access denied. Invalid secret key." };
 
+// --- ADMIN KEY VALIDATION HELPER ---
+const isValidAdminKey = (header) => {
+    if (!header || typeof header !== 'string') {
+        return false;
+    }
+    const providedHash = crypto.createHash('sha256').update(header).digest();
+    
+    if (providedHash.length !== prehashedAdminSecret.length) {
+        return false;
+    }
+    
+    return crypto.timingSafeEqual(providedHash, prehashedAdminSecret);
+};
 
 
 // admin registration route
 app.post('/api/v1/auth/admin-register', RegisterLimiter , async (req, res) => {
   try {
     const adminHeader = req.headers['x-admin-secret'];
-    const uniformAuthError = {message: "Access denied. Invalid secret key."};
 
-    // check admin header before touching request body
-    if(!adminHeader || typeof adminHeader !=='string') {
-      return res.status(401).json(uniformAuthError);
-    }
-    const providedHash = crypto.createHash('sha256').update(adminHeader).digest();
-
-    if( providedHash.length !== prehashedAdminSecret.length || !crypto.timingSafeEqual(providedHash, prehashedAdminSecret)) {
+    if(!isValidAdminKey(adminHeader)) {
       return res.status(401).json(uniformAuthError);
     }
     
@@ -149,7 +158,7 @@ app.post('/api/v1/auth/admin-register', RegisterLimiter , async (req, res) => {
 
     // print verification link to the terminal
     const appUrl = process.env.APP_URL;
-    const verifyUrl = `${process.env.APP_URL}${PORT}/api/v1/auth/verify-email?token=${rawToken}`;
+    const verifyUrl = `${process.env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`;
     
     console.log('----------------------------------------------------');
     console.log('ADMIN EMAIL VERIFICATION LINK (Terminal Test Only):');
@@ -210,7 +219,7 @@ app.post("/api/v1/auth/register", RegisterLimiter, async (req, res) => {
     const newUser = result.rows[0];
 
     // Log the verification url
-    const verificationUrl = `${process.env.APP_URL}${PORT}/api/v1/auth/verify-email?token=${rawToken}`;
+    const verificationUrl = `${process.env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`;
     console.log("EMAIL VERIFICATION LINK (Terminal Test Only):");
     console.log(verificationUrl);
     console.log("----------------------------------------------------");
@@ -284,7 +293,7 @@ app.get("/api/v1/auth/verify-email", async (req, res) => {
 
 // Login route
 
-app.post("/api/v1/auth/login", async (req, res) => {
+app.post("/api/v1/auth/login",loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -392,7 +401,7 @@ app.get(
 );
 
 // Forgot password endpoint
-app.post("/api/v1/auth/forgot-password", async (req, res) => {
+app.post("/api/v1/auth/forgot-password",forgotPasswordLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
