@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
+const { adminRegisterLimiter } = require("./middleware/limiter");
 const PORT = process.env.PORT;
 const app = express();
 const adminSecretKey = process.env.ADMIN_SECRET_KEY
