@@ -1,4 +1,5 @@
 // server.js
+require('dotenv').config();
 const express = require("express");
 const db = require("./db");
 const bcrypt = require("bcrypt");
@@ -12,6 +13,9 @@ const app = express();
 const adminSecretKey = process.env.ADMIN_SECRET_KEY
 const jwtSecret = process.env.JWT_SECRET
 
+// to parse incoming data
+app.use(express.json());
+
 // CRITICAL BOOT CHECKS
 if (!jwtSecret || jwtSecret.length < 32) {
   throw new Error("JWT secret is missing or too short")
@@ -21,32 +25,55 @@ if (!adminSecretKey || adminSecretKey.length < 32) {
 }
 
 // pre-hashing admin secret key
-const prehashedAdminSecret = crypto.createHash('sha256').update(adminSecretKey).digest('hex');
-
-// to parse incoming data
-app.use(express.json());
+const prehashedAdminSecret = crypto.createHash('sha256').update(String(adminSecretKey)).digest();
 
 // creating re-usable helpers
 
 const validateAndSanitizeBody = (body) => {
-  if (!body ||  body !== 'object') {
-    throw new Error("Invalid request body.")
+  if (!body || typeof body !== 'object') {
+    const err = new Error("Invalid request body.");
+    err.status = 400;
+    throw err;
   }
 
-  const { first_name, last_name, email, password} = req.body;
+  const { first_name, last_name, email, password } = body;
 
-  if( typeof first_name  !== 'string' || typeof last_name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
-    throw new Error("All registration fields must be text strings.");
+  if (typeof first_name !== 'string' || typeof last_name !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+    const err = new Error("All registration fields must be text strings.");
+    err.status = 400;
+    throw err;
+  }
+
+  if (!first_name.trim()) {
+    const err = new Error("First name is required.");
+    err.status = 400;
+    throw err;
+  }
+
+  if (!last_name.trim()) {
+    const err = new Error("Last name is required.");
+    err.status = 400;
+    throw err;
   }
 
   const cleanedEmail = email.trim().toLowerCase();
 
-  if (!first_name.trim() || !last_name.trim() || !cleanedEmail || !password) {
-    throw new Error("All fields are required.");
+  if (!cleanedEmail || !cleanedEmail.includes("@")) {
+    const err = new Error("Enter a valid email address.");
+    err.status = 400;
+    throw err;
   }
 
-  if (password < 8) {
-    throw new Error("Password must be at least 8 characters long.");
+  if (!password) {
+    const err = new Error("Password is required.");
+    err.status = 400;
+    throw err;
+  }
+
+  if (password.length < 8) {
+    const err = new Error("Password must be at least 8 characters long.");
+    err.status = 400;
+    throw err;
   }
 
   return {
@@ -54,18 +81,17 @@ const validateAndSanitizeBody = (body) => {
     last_name: last_name.trim(),
     email: cleanedEmail,
     password: password
-  }
-
+  };
 };
 
 const hashPassword = async (password) => {
   const saltRounds = 10;
-  return await bcrypt.hash(password, saltRounds);
+  return bcrypt.hash(password, saltRounds);
 };
 
 const generateVerificationToken = () => {
   const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 return { rawToken, tokenHash};
 };
 
@@ -80,38 +106,38 @@ app.post('/api/v1/auth/admin-register', async (req, res) => {
 
     // check admin header before touching request body
     if(!adminHeader || typeof adminHeader !=='string') {
-      return res.status(403).json(uniformAuthError);
+      return res.status(401).json(uniformAuthError);
     }
-    const providedHash = crypto.createHash('sha256').update(adminHeader).digest('hex');
+    const providedHash = crypto.createHash('sha256').update(adminHeader).digest();
 
     if( providedHash.length !== prehashedAdminSecret.length || !crypto.timingSafeEqual(providedHash, prehashedAdminSecret)) {
-      res.status(403).json(uniformAuthError);
+      return res.status(401).json(uniformAuthError);
     }
     
     // sanitize the request body
     const sanitizedData = validateAndSanitizeBody(req.body);
 
     // hash password and generate email verification token
-    const passwordHash = hashPassword(sanitizedData.password);
-    const {rawToken, hashToken} = generateVerificationToken();
+    const passwordHash = await hashPassword(sanitizedData.password);
+    const {rawToken, tokenHash} = generateVerificationToken();
     
     // insert admin user into database
     const insertQuery = `
       INSERT INTO users (
           first_name, last_name, email, password_hash, user_role,
-          is_verified, verification_token_hash, verification_expires_at
+          email_verification_token_hash, email_verification_expires_at
       )
-      VALUES ($1, $2, $3, $4, 'admin', FALSE, $5, NOW() + INTERVAL '24 hours')
+      VALUES ($1, $2, $3, $4, 'admin', $5, NOW() + INTERVAL '24 hours')
       RETURNING id, first_name, last_name, email, user_role, is_verified, created_at;
     `;
 
-    const result = db.query(
+    const result = await db.query(
       insertQuery, [
         sanitizedData.first_name,
         sanitizedData.last_name,
         sanitizedData.email,
         passwordHash,
-        hashToken
+        tokenHash
       ]
     )
 
@@ -135,9 +161,12 @@ app.post('/api/v1/auth/admin-register', async (req, res) => {
 
   } catch (error) {
     if (error.code === '23505') {
-            return res.status(409).json({ message: 'An account with this email address already exists.' });
-        }
-        console.error('Admin registration error:', error);
+        return res.status(409).json({ message: 'An account with this email address already exists.' });
+    }
+    if (error.status === 400) {
+        return res.status(400).json({ message: error.message });
+    }
+    console.error('Admin registration error:', error);
         return res.status(500).json({ message: error.message || 'Internal server error.' });
     
   }
@@ -148,74 +177,36 @@ app.post('/api/v1/auth/admin-register', async (req, res) => {
 
 app.post("/api/v1/auth/register", async (req, res) => {
   try {
-    const { first_name, last_name, email, password } = req.body;
-
-    if (
-      typeof first_name !== "string" ||
-      typeof last_name !== "string" ||
-      typeof email !== "string" ||
-      typeof password !== "string"
-    ) {
-      return res.status(400).json({
-        message: "Invalid input, check email or password entry!",
-      });
-    }
-    // clean the provided email
-
-    const cleanedEmail = email.trim().toLowerCase();
-
-    // checking for required fields
-    if (!first_name.trim() || !last_name.trim() || !cleanedEmail || !password) {
-      return res.status(400).json({
-        message: "All fields are required.",
-      });
-    }
-
-    if (!cleanedEmail.includes("@")) {
-      return res.status(400).json({
-        message: "Enter a valid email address",
-      });
-    }
-
-    if (password.length < 8) {
-      return res.status(400).json({
-        message: "Password must be at least 8 characters long!",
-      });
-    }
+    const sanitizedData = validateAndSanitizeBody(req.body);
 
     // let's hash the password
-
-    const password_hash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(sanitizedData.password);
 
     // create and hash the verification token
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(rawToken)
-      .digest("hex");
-    const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const {rawToken, tokenHash} = generateVerificationToken();
 
     // parameterized queries
 
     const insertQuery = `
-      INSERT INTO users (first_name, last_name, email, password_hash, email_verification_token_hash, email_verification_expires_at)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO users 
+      (
+      first_name, last_name, email, password_hash, email_verification_token_hash, email_verification_expires_at)
+      VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '24 hours')
       RETURNING id, first_name, last_name, email, user_role, is_verified, created_at`;
 
     const values = [
-      first_name.trim(),
-      last_name.trim(),
-      cleanedEmail,
-      password_hash,
-      tokenHash,
-      tokenExpiresAt,
+      sanitizedData.first_name,
+      sanitizedData.last_name,
+      sanitizedData.email,
+      passwordHash,
+      tokenHash
     ];
 
     const result = await db.query(insertQuery, values);
     const newUser = result.rows[0];
 
     // Log the verification url
-    const verificationUrl = `${process.env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`;
+    const verificationUrl = `${process.env.APP_URL}${PORT}/api/v1/auth/verify-email?token=${rawToken}`;
     console.log("EMAIL VERIFICATION LINK (Terminal Test Only):");
     console.log(verificationUrl);
     console.log("----------------------------------------------------");
@@ -230,7 +221,9 @@ app.post("/api/v1/auth/register", async (req, res) => {
         message: "An account with this email address already exists.",
       });
     }
-
+    if (err.status === 400) {
+      return res.status(400).json({ message: err.message });
+    }
     console.error("Registration error:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
