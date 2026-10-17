@@ -1,5 +1,4 @@
 // server.js
-require('dotenv').config();
 const express = require("express");
 const db = require("./db");
 const bcrypt = require("bcrypt");
@@ -7,7 +6,6 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
-const { type } = require("os");
 const PORT = process.env.PORT;
 const app = express();
 const adminSecretKey = process.env.ADMIN_SECRET_KEY
@@ -72,6 +70,12 @@ const validateAndSanitizeBody = (body) => {
 
   if (password.length < 8) {
     const err = new Error("Password must be at least 8 characters long.");
+    err.status = 400;
+    throw err;
+  }
+
+  if (password.length > 72) {
+    const err = new Error("Password cannot exceed 72 characters.");
     err.status = 400;
     throw err;
   }
@@ -145,7 +149,7 @@ app.post('/api/v1/auth/admin-register', async (req, res) => {
 
     // print verification link to the terminal
     const appUrl = process.env.APP_URL;
-    const verifyUrl = `${appUrl}/api/v1/auth/verify-email?token=${rawToken}`;
+    const verifyUrl = `${process.env.APP_URL}${PORT}/api/v1/auth/verify-email?token=${rawToken}`;
     
     console.log('----------------------------------------------------');
     console.log('ADMIN EMAIL VERIFICATION LINK (Terminal Test Only):');
@@ -167,7 +171,7 @@ app.post('/api/v1/auth/admin-register', async (req, res) => {
         return res.status(400).json({ message: error.message });
     }
     console.error('Admin registration error:', error);
-        return res.status(500).json({ message: error.message || 'Internal server error.' });
+        return res.status(500).json({ message: 'Internal server error.' });
     
   }
 });
