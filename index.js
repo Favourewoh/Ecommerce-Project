@@ -1,4 +1,5 @@
 // server.js
+require('dotenv').config()
 const express = require("express");
 const db = require("./db");
 const bcrypt = require("bcrypt");
@@ -8,6 +9,7 @@ const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
 const { RegisterLimiter, loginLimiter, forgotPasswordLimiter } = require("./middleware/limiter");
 const { validateAndSanitizeBody, hashPassword, generateVerificationToken } = require('./utils/authHelpers');
+const { isValidAdminKey} = require('./utils/security')
 const PORT = process.env.PORT;
 const app = express();
 const adminSecretKey = process.env.ADMIN_SECRET_KEY
@@ -17,35 +19,8 @@ const jwtSecret = process.env.JWT_SECRET
 app.use(express.json());
 app.disable("x-powered-by");
 
-// CRITICAL BOOT CHECKS
-if (!jwtSecret || jwtSecret.length < 32) {
-  throw new Error("JWT secret is missing or too short")
-}
-if (!adminSecretKey || adminSecretKey.length < 32) {
-  throw new Error("Admin key is missing or too short")
-}
-
-// pre-hashing admin secret key
-const prehashedAdminSecret = crypto.createHash('sha256').update(String(adminSecretKey)).digest();
-
-
 // --- TOP-LEVEL CONSTANTS ---
 const uniformAuthError = { message: "Access denied. Invalid secret key." };
-
-// --- ADMIN KEY VALIDATION HELPER ---
-const isValidAdminKey = (header) => {
-    if (!header || typeof header !== 'string') {
-        return false;
-    }
-    const providedHash = crypto.createHash('sha256').update(header).digest();
-    
-    if (providedHash.length !== prehashedAdminSecret.length) {
-        return false;
-    }
-    
-    return crypto.timingSafeEqual(providedHash, prehashedAdminSecret);
-};
-
 
 // admin registration route
 app.post('/api/v1/auth/admin-register', RegisterLimiter , async (req, res) => {

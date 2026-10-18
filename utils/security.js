@@ -1,15 +1,15 @@
 const crypto = require('crypto');
 
 // CRITICAL BOOT CHECKS
-if (!jwtSecret || jwtSecret.length < 32) {
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   throw new Error("JWT secret is missing or too short")
 }
-if (!adminSecretKey || adminSecretKey.length < 32) {
+if (!process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET_KEY.length < 32) {
   throw new Error("Admin key is missing or too short")
 }
 
 // pre-hashing admin secret key
-const prehashedAdminSecret = crypto.createHash('sha256').update(String(adminSecretKey)).digest();
+const prehashedAdminSecret = crypto.createHash('sha256').update(String(process.env.ADMIN_SECRET_KEY)).digest();
 
 // --- ADMIN KEY VALIDATION HELPER ---
 const isValidAdminKey = (header) => {
