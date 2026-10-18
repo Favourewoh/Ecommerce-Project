@@ -1,9 +1,6 @@
 const crypto = require('crypto');
 
 // CRITICAL BOOT CHECKS
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  throw new Error("JWT secret is missing or too short")
-}
 if (!process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET_KEY.length < 32) {
   throw new Error("Admin key is missing or too short")
 }

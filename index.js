@@ -12,8 +12,11 @@ const { validateAndSanitizeBody, hashPassword, generateVerificationToken } = req
 const { isValidAdminKey} = require('./utils/security')
 const PORT = process.env.PORT;
 const app = express();
-const adminSecretKey = process.env.ADMIN_SECRET_KEY
-const jwtSecret = process.env.JWT_SECRET
+
+// boot checks
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  throw new Error("JWT secret is missing or too short")
+}
 
 // to parse incoming data
 app.use(express.json());
