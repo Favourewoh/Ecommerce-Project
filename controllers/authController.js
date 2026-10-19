@@ -1,6 +1,7 @@
 const db = require('../db')
 const { validateAndSanitizeBody, hashPassword, generateVerificationToken } = require('../utils/authHelpers');
 const { isValidAdminKey} = require('../utils/security');
+const uniformAuthError = { message: "Access denied. Invalid secret key." };
 
 // merchant register controller
 const register = async (req, res) => {
@@ -56,7 +57,6 @@ const register = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
 
 // admin register controller
 const adminRegister = async (req, res) => {
@@ -125,8 +125,57 @@ const adminRegister = async (req, res) => {
   }
 };
 
+// email verification controller
+const emailVerification = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    // checking if token is a valid string and exists
+
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({
+        message: "Invalid request. Verification token is required!",
+      });
+    }
+
+    // now I going to hash the incoming token using SHA 256
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    // I'll look up the hash in our database and also update is_verified if we find something
+
+    const verificationQuery = `
+        UPDATE users 
+          SET is_verified = true, 
+              email_verification_token_hash = NULL, 
+              email_verification_expires_at = NULL, 
+              updated_at = NOW() 
+          WHERE email_verification_token_hash = $1 
+            AND email_verification_expires_at > NOW() 
+          RETURNING id, email;  
+      `;
+    const result = await db.query(verificationQuery, [tokenHash]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        message: "Invalid or expired link.",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Email verified successfully! You can now log in.",
+    });
+  } catch (err) {
+    console.error("Email verification error:", err);
+    return res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
 
 module.exports = {
     register,
-    adminRegister
+    adminRegister,
+    emailVerification
 };
