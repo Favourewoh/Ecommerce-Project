@@ -1,9 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); 
-const bcrypt = require("bcrypt");
-const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
 const authController = require('../controllers/authController')
 
 const { RegisterLimiter, loginLimiter, forgotPasswordLimiter} = require('../middleware/limiter');

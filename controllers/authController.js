@@ -1,7 +1,10 @@
-const db = require('../db')
+const db = require('../db');
 const { validateAndSanitizeBody, hashPassword, generateVerificationToken } = require('../utils/authHelpers');
 const { isValidAdminKey} = require('../utils/security');
 const uniformAuthError = { message: "Access denied. Invalid secret key." };
+const bcrypt = require("bcrypt");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 
 // merchant register controller
 const register = async (req, res) => {
