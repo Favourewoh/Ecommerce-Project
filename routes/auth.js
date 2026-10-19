@@ -11,71 +11,7 @@ const uniformAuthError = { message: "Access denied. Invalid secret key." };
 const { RegisterLimiter, loginLimiter, forgotPasswordLimiter} = require('../middleware/limiter');
 
 // admin registration route
-router.post('/admin-register', RegisterLimiter , async (req, res) => {
-  try {
-    const adminHeader = req.headers['x-admin-secret'];
-
-    if(!isValidAdminKey(adminHeader)) {
-      return res.status(401).json(uniformAuthError);
-    }
-    
-    // sanitize the request body
-    const sanitizedData = validateAndSanitizeBody(req.body);
-
-    // hash password and generate email verification token
-    const passwordHash = await hashPassword(sanitizedData.password);
-    const {rawToken, tokenHash} = generateVerificationToken();
-    
-    // insert admin user into database
-    const insertQuery = `
-      INSERT INTO users (
-          first_name, last_name, email, password_hash, user_role,
-          email_verification_token_hash, email_verification_expires_at
-      )
-      VALUES ($1, $2, $3, $4, 'admin', $5, NOW() + INTERVAL '24 hours')
-      RETURNING id, first_name, last_name, email, user_role, is_verified, created_at;
-    `;
-
-    const result = await db.query(
-      insertQuery, [
-        sanitizedData.first_name,
-        sanitizedData.last_name,
-        sanitizedData.email,
-        passwordHash,
-        tokenHash
-      ]
-    )
-
-    const newUser = result.rows[0];
-
-    // print verification link to the terminal
-    const appUrl = process.env.APP_URL;
-    const verifyUrl = `${process.env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`;
-    
-    console.log('----------------------------------------------------');
-    console.log('ADMIN EMAIL VERIFICATION LINK (Terminal Test Only):');
-    console.log(verifyUrl);
-    console.log('----------------------------------------------------');
-
-    // return success response
-    return res.status(201).json({
-        message: 'Admin account successfully created. Please check your email to verify your account.',
-        user: newUser
-    });
-
-
-  } catch (error) {
-    if (error.code === '23505') {
-        return res.status(409).json({ message: 'An account with this email address already exists.' });
-    }
-    if (error.status === 400) {
-        return res.status(400).json({ message: error.message });
-    }
-    console.error('Admin registration error:', error);
-        return res.status(500).json({ message: 'Internal server error.' });
-    
-  }
-});
+router.post('/admin-register', RegisterLimiter , authController.adminRegister);
 
 // merchant registration route
 router.post("/register", RegisterLimiter, authController.register)
