@@ -173,9 +173,89 @@ const emailVerification = async (req, res) => {
   }
 };
 
+// forgot password controller
+const forgotPassword = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // check for strings
+    if (typeof email == !"string" || typeof password == !"string") {
+      return res.status(400).json({
+        message: "Invalid input in email or password",
+      });
+    }
+
+    // check if required fields are present
+    if (!email || !email.trim() || !password) {
+      return res
+        .status(400)
+        .json({ message: "Email and password are required!" });
+    }
+
+    // clean the email
+    let cleanEmail = email.toLowerCase().trim();
+
+    // now I query the database for the user
+
+    const userQuery = `
+        SELECT id, first_name, last_name, email, password_hash, user_role, is_verified 
+        FROM users 
+        WHERE email = $1;
+    `;
+    const result = await db.query(userQuery, [cleanEmail]);
+
+    // checking if the user exists
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: "Invalid email or password!" });
+    }
+
+    const user = result.rows[0];
+
+    // comparing input password with stored password
+
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email or password!" });
+    }
+
+    // check account verification
+
+    if (!user.is_verified) {
+      return res.status(403).json({
+        message: "Please verify your email before logging in.",
+      });
+    }
+
+    // Generate jwt
+
+    const token = jwt.sign(
+      { id: user.id, role: user.user_role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "1h" },
+    );
+
+    return res.status(200).json({
+      message: "User successfully logged in!",
+      token,
+      user: {
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.user_role,
+        isVerified: user.is_verified,
+      },
+    });
+  } catch (err) {
+    console.error("Login error", err);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
 
 module.exports = {
     register,
     adminRegister,
-    emailVerification
+    emailVerification,
+    forgotPassword
 };
