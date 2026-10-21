@@ -10,3 +10,6 @@ The only way to become verified is the email verification link. Keeping one rout
 
 ### Why the admin key check runs before body validation
 The key is checked first so someone without it learns nothing about the route. If validation ran first, error messages like “password too short” or “email already exists” would reveal my rules and which emails are registered. With the key check first, every request without the right key gets the same 401 and the same message, whatever is in the body.
+
+### Why timingSafeEqual plus SHA-256, and why the server refuses to boot without the key
+Comparing with === stops at the first wrong character, so an attacker could measure response times and guess the key one character at a time. timingSafeEqual takes the same time however many characters match. It needs two buffers of equal length, so I hash both the incoming key and the real key with SHA-256, which always gives 32 bytes. If the server started without a key, or with an empty one, anyone could send an empty header and get in. So the boot check throws an error and the server refuses to start.
