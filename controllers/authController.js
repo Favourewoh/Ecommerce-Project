@@ -97,14 +97,8 @@ const adminRegister = async (req, res) => {
 
     const newUser = result.rows[0];
 
-    // print verification link to the terminal
-    const appUrl = process.env.APP_URL;
-    const verifyUrl = `${process.env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`;
-    
-    console.log('----------------------------------------------------');
-    console.log('ADMIN EMAIL VERIFICATION LINK (Terminal Test Only):');
-    console.log(verifyUrl);
-    console.log('----------------------------------------------------');
+    // Send the verification email using Resend
+    await sendVerificationEmail(sanitizedData.email, rawToken);
 
     // return success response
     return res.status(201).json({
