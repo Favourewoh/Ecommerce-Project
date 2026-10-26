@@ -19,3 +19,9 @@ A caller without the right key hasn’t been authenticated, so the route returns
 
 ### Why limits are per IP, and why forgot-password is tight
 Limits count per IP, not per account, because an account lock would let an attacker lock me out of my own account just by typing wrong passwords for my email. Login uses skipSuccessfulRequests, so only failed attempts count and real users aren’t blocked. Forgot-password is tight because it could flood a victim’s inbox and each request replaces their pending reset token. Email providers also cap sends.
+
+### What error.status === 400 links between the helper and the routes
+validateAndSanitizeBody throws an error with status = 400 and a message when input is bad. The controller’s catch checks error.status === 400 and returns that message as a 400. The number is the only link between the two files, so a typo in either place turns a validation error into a 500 with no warning. Testing a bad body is the best way I would catch it.
+
+### What a controller does that a route file doesn’t
+The route file decides where a request goes and which checks run first, such as rate limiters and auth middleware. The controller holds the logic: reading the request, calling helpers, querying the database and sending the response. The limiter stays in the route file because it must run before the controller, so a blocked request (429) never reaches the handler and never costs bcrypt or database work.
