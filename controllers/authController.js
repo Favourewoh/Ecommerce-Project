@@ -5,6 +5,7 @@ const uniformAuthError = { message: "Access denied. Invalid secret key." };
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
+const {sendVerificationEmail} = require('../utils/mailer');
 
 // merchant register controller
 const register = async (req, res) => {
@@ -37,11 +38,8 @@ const register = async (req, res) => {
     const result = await db.query(insertQuery, values);
     const newUser = result.rows[0];
 
-    // Log the verification url
-    const verificationUrl = `${process.env.APP_URL}/api/v1/auth/verify-email?token=${rawToken}`;
-    console.log("EMAIL VERIFICATION LINK (Terminal Test Only):");
-    console.log(verificationUrl);
-    console.log("----------------------------------------------------");
+    // Send the verification email using Resend
+    await sendVerificationEmail(sanitizedData.email, rawToken);
 
     return res.status(201).json({
       message: "User registered successfully!",
