@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController')
 
-const { RegisterLimiter, loginLimiter, forgotPasswordLimiter} = require('../middleware/limiter');
+const { RegisterLimiter, loginLimiter, forgotPasswordLimiter, resendVerificationLimiter} = require('../middleware/limiter');
 
 // admin registration route
 router.post('/admin-register', RegisterLimiter , authController.adminRegister);
@@ -12,6 +12,9 @@ router.post("/register", RegisterLimiter, authController.register)
 
 // verifying email router
 router.get("/verify-email", authController.emailVerification);
+
+// resend verification email
+router.post("/resend-verification", resendVerificationLimiter,authController.resendVerification);
 
 // Login route
 router.post("/login",loginLimiter, authController.login);

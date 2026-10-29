@@ -33,6 +33,14 @@ const forgotPasswordLimiter = rateLimit({
     message: { message: 'Too many attempts, please try again later.' }
 });
 
+const resendVerificationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3, // Limit each IP to 3 requests per windowMs
+  message: { message: "Too many resend requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 
 
 
@@ -40,5 +48,6 @@ const forgotPasswordLimiter = rateLimit({
 module.exports = {
     RegisterLimiter,
     forgotPasswordLimiter,
-    loginLimiter
+    loginLimiter,
+    resendVerificationLimiter
 };

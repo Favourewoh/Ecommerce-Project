@@ -168,7 +168,47 @@ const emailVerification = async (req, res) => {
   }
 };
 
-// login controller
+// resend verification mail
+const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ message: "A valid email address is required." });
+    }
+
+    const cleanedEmail = email.trim().toLowerCase();
+
+    // Generate a fresh verification token
+    const { rawToken, tokenHash } = generateVerificationToken();
+
+    // Update query
+    const updateQuery = `
+      UPDATE users 
+      SET email_verification_token_hash = $1, 
+          email_verification_expires_at = NOW() + INTERVAL '24 hours'
+      WHERE email = $2 AND is_verified = FALSE
+      RETURNING id;
+    `;
+
+    const result = await db.query(updateQuery, [tokenHash, cleanedEmail]);
+
+    // Security: If a user was found and updated, send the email. 
+    // Either way, return the exact same generic success message to prevent email enumeration.
+    if (result.rows.length > 0) {
+      await sendVerificationEmail(cleanedEmail, rawToken);
+    }
+
+    return res.status(200).json({
+      message: "If an unverified account with that email exists, a new verification link has been sent.",
+    });
+
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -314,7 +354,6 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-
 // reset password controller
 const resetPassword = async (req, res) => {
   try {
@@ -384,6 +423,7 @@ module.exports = {
     register,
     adminRegister,
     emailVerification,
+    resendVerification,
     login,
     forgotPassword,
     resetPassword
