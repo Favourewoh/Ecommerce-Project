@@ -4,8 +4,33 @@ const express = require("express");
 const authenticateToken = require("./middleware/auth");
 const authorizeRoles = require("./middleware/authorize");
 const PORT = process.env.PORT;
-const app = express();
 const authRouter = require('./routes/auth');
+const helmet = require('helmet');
+const cors = require('cors');
+
+const app = express();
+app.use(helmet());
+
+// 2. CORS Configuration
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(",").map((o) => o.trim()) 
+  : [];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Postman, or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 // boot checks
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -14,7 +39,6 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 
 // to parse incoming data
 app.use(express.json());
-app.disable("x-powered-by");
 app.use('/api/v1/auth', authRouter);
 
 

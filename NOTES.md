@@ -25,3 +25,9 @@ validateAndSanitizeBody throws an error with status = 400 and a message when inp
 
 ### What a controller does that a route file doesn’t
 The route file decides where a request goes and which checks run first, such as rate limiters and auth middleware. The controller holds the logic: reading the request, calling helpers, querying the database and sending the response. The limiter stays in the route file because it must run before the controller, so a blocked request (429) never reaches the handler and never costs bcrypt or database work.
+
+### Who enforces CORS
+The browser enforces CORS. My server sends the response, and the browser checks whether the response carries permission (the Access-Control-Allow-Origin header) for the page’s origin. If not, the page’s JavaScript can’t read the data. Tools like Postman ignore CORS, so it protects browser users, not the API itself.
+
+### Why not cors({ origin: "*" })
+" * " lets any website’s JavaScript read my API’s responses, which removes the browser’s protection. It’s worse if I ever move to cookie-based login. I allow only specific, trusted origins, read from an environment variable, so I can change them per environment without touching the code.
