@@ -1,13 +1,11 @@
 // server.js
 require('dotenv').config()
 const express = require("express");
-const authenticateToken = require("./middleware/auth");
-const authorizeRoles = require("./middleware/authorize");
 const PORT = process.env.PORT;
 const authRouter = require('./routes/auth');
 const helmet = require('helmet');
 const cors = require('cors');
-
+const dashboardRouter = require('./routes/dashboard');
 const app = express();
 
 app.use(helmet());
@@ -41,37 +39,13 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
 // to parse incoming data
 app.use(express.json());
 
+// auth
 app.use('/api/v1/auth', authRouter);
 
 
 
-// let's route the dashboard
-
-// Merchant and admin accessible route
-app.get(
-  "/api/v1/dashboard",
-  authenticateToken,
-  authorizeRoles("merchant", "admin"),
-  (req, res) => {
-    res.status(200).json({
-      message: `Welcome to the dashboard, User #${req.user.id}`,
-      Role: req.user.role,
-    });
-  },
-);
-
-// Admin only dashboard
-app.get(
-  "/api/v1/admin/dashboard",
-  authenticateToken,
-  authorizeRoles("admin"),
-  (req, res) => {
-    res.status(200).json({
-      message: `Welcome to the Admin Control Panel`,
-      Role: req.user.role,
-    });
-  },
-);
+//dashboard
+app.use('/api/v1/dashboard', dashboardRouter)
 
 
 
