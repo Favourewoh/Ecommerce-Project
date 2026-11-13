@@ -31,11 +31,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// boot checks
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-  throw new Error("JWT secret is missing or too short")
-};
-
 // to parse incoming data
 app.use(express.json());
 
