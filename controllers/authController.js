@@ -235,7 +235,7 @@ const login = async (req, res) => {
     const userQuery = `
         SELECT id, first_name, last_name, email, password_hash, user_role, is_verified 
         FROM users 
-        WHERE email = $1;
+        WHERE LOWER(email) = $1;
     `;
     const result = await db.query(userQuery, [cleanEmail]);
 

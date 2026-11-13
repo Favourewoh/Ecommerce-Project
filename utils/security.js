@@ -2,7 +2,7 @@ const crypto = require('crypto');
 
 // CRITICAL BOOT CHECKS
 if (!process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET_KEY.length < 32 || !process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
-  throw new Error("Admin key is missing or too short")
+  throw new Error("Admin key is missing or too short, or resend API key or email from is missing")
 }
 
 // pre-hashing admin secret key
