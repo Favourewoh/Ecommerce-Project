@@ -15,22 +15,26 @@ A REST API for authentication and role-based access control, built with Node.js,
 
 ```
 ecomm-project/
-├── index.js                  # app setup, middleware, router mounting, dashboard routes
+├── index.js                     # app setup, middleware, router mounting, dashboard routes
 ├── db/
-│   ├── index.js              # pg Pool, exports { query }
-│   └── schema.sql            # users table and indexes   <!-- CHECK path -->
-├── routes/auth.js            # auth URLs and the middleware that runs before each handler
-├── controllers/authController.js   # handler logic
+│   ├── index.js                 # pg Pool, exports { query }
+│   └── schema.sql               # users table and indexes   <!-- CHECK path -->
+├── routes/auth.js            
+│   ├── auth.js                  # auth URLs and the middleware that runs before each handler
+│   ├── dashboard.js             # dashboard URLs and the middleware that runs before each handler
+├── controllers/
+│   ├── authController.js        # handler logic
+│   ├── dashboardController.js   # handler logic
 ├── middleware/               
-│   ├── auth.js               # authenticateToken
-│   ├── authorize.js          # authorizeRoles
-│   └── limiter.js            # rate limiters
+│   ├── auth.js                  # authenticateToken
+│   ├── authorize.js             # authorizeRoles
+│   └── limiter.js               # rate limiters
 ├── utils/
-│   ├── authHelpers.js        # validation, password hashing, verification tokens
-│   ├── security.js           # admin key check (timing-safe)
-│   └── mailer.js             # sendEmail, sendVerificationEmail
-├── .env.example              # variable names only
-└── NOTES.md                  # design decisions in my own words
+│   ├── authHelpers.js           # validation, password hashing, verification tokens
+│   ├── security.js              # admin key check (timing-safe)
+│   └── mailer.js                # sendEmail, sendVerificationEmail
+├── .env.example                 # variable names only
+└── NOTES.md                     # design decisions in my own words
 ```
 
 ## Setup
@@ -89,8 +93,8 @@ All auth routes are under `/api/v1/auth`.
 | POST | `/forgot-password` | Anyone; limited to 3 requests per 15 minutes per IP | Sends a reset link. Same response whether or not the account exists |
 | POST | `/reset-password` | Anyone with a valid reset token | Sets a new password. The token works once |
 | POST | `/resend-verification` | Anyone; limited to 3 requests per 15 minutes per IP | Sends a new verification link to an unverified account. Same response in every case |
-| GET | `/api/v1/dashboard` | Any logged-in user (`authenticateToken`) | Returns the caller's id and role |
-| GET | `/api/v1/admin/dashboard` | Admins only (`authenticateToken`, then `authorizeRoles("admin")`) | Admin-only test route |
+| GET | `/api/v1/dashboard/user` | Any logged-in user (`authenticateToken`) | Returns the caller's id and role |
+| GET | `/api/v1/dashboard/admin` | Admins only (`authenticateToken`, then `authorizeRoles("admin")`) | Admin-only test route |
 
 Protected routes expect `Authorization: Bearer <token>`.
 
