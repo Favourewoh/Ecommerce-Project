@@ -11,6 +11,7 @@ const YAML = require('yaml');
 const fs = require('node:fs');
 const path = require('node:path');
 const app = express();
+app.set('trust proxy', 1)
 
 
 app.use(helmet());
