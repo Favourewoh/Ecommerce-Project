@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const {sendVerificationEmail} = require('../utils/mailer');
+const { raw } = require('express');
 
 // merchant register controller
 const register = async (req, res) => {
@@ -38,12 +39,13 @@ const register = async (req, res) => {
     const result = await db.query(insertQuery, values);
     const newUser = result.rows[0];
 
-    // Send the verification email using Resend
-    await sendVerificationEmail( sanitizedData.email, rawToken);
+    // Send the verification email using Resend (email placeholder because domain is unverified)
+    await sendVerificationEmail( "favourewoh99@gmail.com", rawToken);
 
     return res.status(201).json({
       message: "User registered successfully!",
-      user: newUser
+      user: newUser,
+      emailVerificationToken: rawToken
     });
   } catch (err) {
     if (err.code === "23505") {
@@ -97,13 +99,14 @@ const adminRegister = async (req, res) => {
 
     const newUser = result.rows[0];
 
-    // Send the verification email using Resend
-    await sendVerificationEmail(sanitizedData.email, rawToken);
+    // Send the verification email using Resend (email placeholder because domain is unverified)
+    await sendVerificationEmail("favourewoh99@gmail.com", rawToken);
 
     // return success response
     return res.status(201).json({
         message: 'Admin account successfully created. Please check your email to verify your account.',
-        user: newUser
+        user: newUser,
+        rawToken
     });
 
 
@@ -194,13 +197,14 @@ const resendVerification = async (req, res) => {
     const result = await db.query(updateQuery, [tokenHash, cleanedEmail]);
 
     // Security: If a user was found and updated, send the email. 
-    // Either way, return the exact same generic success message to prevent email enumeration.
+    // Either way, return the exact same generic success message to prevent email enumeration.(email placeholder because domain is unverified)
     if (result.rows.length > 0) {
-      await sendVerificationEmail(cleanedEmail, rawToken);
+      await sendVerificationEmail("favourewoh99@gmail.com", rawToken);
     }
 
     return res.status(200).json({
       message: "If an unverified account with that email exists, a new verification link has been sent.",
+      rawToken
     });
 
   } catch (error) {

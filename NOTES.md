@@ -1,4 +1,3 @@
-
 ### Why one UPDATE instead of SELECT then UPDATE (reset-password and verify-email). 
 Since we use tokens, this was done to ensure that in the case where two request are fired at the same time, only the first request is completed and the second request meets nothing to do. this is called an atomic/ all or nothing approach.
 
@@ -31,3 +30,21 @@ The browser enforces CORS. My server sends the response, and the browser checks 
 
 ### Why not cors({ origin: "*" })
 " * " lets any website’s JavaScript read my API’s responses, which removes the browser’s protection. It’s worse if I ever move to cookie-based login. I allow only specific, trusted origins, read from an environment variable, so I can change them per environment without touching the code.
+
+### Why a security scheme and not a normal field in the docs
+A security scheme describes the proof of identity or permission, not the data. The admin key (x-admin-secret) and the Bearer JWT are proof, so they are not part of the JSON body. I declare each one once in the docs, and every route that needs it reuses it, which also gives me the Authorize button so I paste the key or token one time. Headers are not secret, so the reason is not hiding. The reason is what the thing is: proof, not data.
+
+### Why the docs show real status codes, and only the real ones
+The docs show the real status codes (400, 401, 403, 409, 429) so that anyone using the API can understand exactly why they got an error. I only list codes the route really returns, because docs that promise something the code doesn’t do are worse than short docs. When a route changes, I update openapi.yaml in the same commit.
+
+### Why Render for the web service and Neon for the database
+I put the web service on Render and the database on Neon. Render’s free web service goes idle after about 15 minutes, and the first request then takes 30 to 60 seconds to wake it, but after that it is fast, which is fine for a portfolio demo. Render’s free database expires (30 days in one source I read, 90 in another), and I would need a paid plan to get it back, so my data would not last. Neon’s free database has monthly usage limits instead of an expiry date, and it wakes quickly after sleeping, so it fits better. Free plans change, so I check the official pages before relying on the numbers.
+
+### Why one DATABASE_URL instead of five PG_ variables
+One connection string is simpler than five variables: there is one value to set, so fewer chances for a typo. The same name works on my laptop and on Render, and only the value changes (local database on my laptop, Neon on Render), so the code never changes. Neon’s string also carries the encryption option (sslmode=require), which the five variables had no place for. If a password has special characters like @, they must be URL-encoded (@ becomes %40), or the string is misread. Variable names are case-sensitive on Render, so I write DATABASE_URL in capitals everywhere.
+
+### Why trust proxy is set on Render but wasn't needed on my laptop
+On my laptop, requests come straight to my server, so Express sees each visitor's real IP. On Render, every request first passes through Render's proxy, so without a setting Express sees the proxy's address for everyone. My rate limits count per IP, so all visitors would share one counter, and one busy person could lock out everybody else. app.set('trust proxy', 1) tells Express to trust one proxy in front of it and read the real client IP from the X-Forwarded-For header. The number is 1 because there is one proxy. If I set it too high, a caller could fake the header and dodge my limits.
+
+### Why the schema runs on Neon's direct string and the app uses the pooled one
+Neon gives two connection strings. The pooled one (the host with -pooler) goes through a middleman that shares a limited number of real database connections between many clients, which suits a running app that opens many connections. The direct one connects straight to the database, so I used it once from my own machine to create the tables. The app uses the pooled string as DATABASE_URL on Render. This is the usual recommendation, and I confirm it against Neon's docs when things change. The connection string contains my password, so it only goes into Render's environment settings and never into git or a chat.

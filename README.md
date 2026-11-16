@@ -2,6 +2,13 @@
 
 A REST API for authentication and role-based access control, built with Node.js, Express and PostgreSQL. It handles sign-up, email verification, login, password reset and secret-key admin registration, protected by hashed tokens and rate limiting. It covers accounts and roles only, with no products, cart or orders.
 
+## Live demo
+
+- **API docs (Swagger UI):** https://ecomm-auth-api-0312.onrender.com/api-docs
+- **Hosting:** the API runs on Render (free web service) and the database on Neon (free PostgreSQL).
+
+The free web service sleeps when idle, so the first request after a quiet period can take up to about a minute. Later requests are fast. Please use fake data when trying the routes.
+
 ## Stack
 
 - **Runtime:** Node.js, Express
@@ -10,6 +17,7 @@ A REST API for authentication and role-based access control, built with Node.js,
 - **Security:** `helmet`, `cors` (origin allowlist), `express-rate-limit`
 - **Email:** Resend
 - **API docs:** OpenAPI 3.0.3 (`openapi.yaml`), served with `swagger-ui-express` and `yaml`
+- **Hosting:** Render (API), Neon (PostgreSQL)
 - **Dev tools:** `nodemon`, Postman for manual testing
 
 ## Project structure
@@ -19,7 +27,7 @@ ecomm-project/
 ├── index.js                     # app setup, middleware, router mounting, Swagger UI
 ├── openapi.yaml                 # API documentation (OpenAPI spec, hand-written)
 ├── db/
-│   ├── index.js                 # pg Pool, exports { query }
+│   ├── index.js                 # pg Pool (reads DATABASE_URL), exports { query }
 │   └── schema.sql               # users table and indexes
 ├── routes/
 │   ├── auth.js                  # auth URLs and the middleware that runs before each handler
@@ -39,7 +47,7 @@ ecomm-project/
 └── NOTES.md                     # design decisions in my own words
 ```
 
-## Setup
+## Setup (local)
 
 1. Clone the repository and install dependencies:
    ```bash
@@ -52,6 +60,7 @@ ecomm-project/
    ```bash
    psql -U <your-user> -d ecomm_auth -f db/schema.sql
    ```
+   On a hosted database (for example Neon) you can instead paste `db/schema.sql` into the provider's SQL editor.
 4. Copy `.env.example` to `.env` and fill in every value (see below).
 5. Start the server:
    ```bash
@@ -66,15 +75,15 @@ Names only. Never commit real values.
 
 | Variable | Purpose |
 |---|---|
-| `PORT` | Port the server listens on |
-| `PG_USER`, `PG_HOST`, `PG_DB`, `PG_PASS`, `PG_PORT` | PostgreSQL connection |
+| `PORT` | Port the server listens on. Set it locally. Render provides it in production |
+| `DATABASE_URL` | PostgreSQL connection string, for example `postgresql://user:password@localhost:5432/ecomm_auth`. Special characters in the password (such as `@`) must be URL-encoded, for example `@` becomes `%40` |
 | `JWT_SECRET` | Signs JWTs. Random, at least 32 characters |
 | `JWT_EXPIRES_IN` | Token lifetime, for example `1h` |
 | `ADMIN_SECRET_KEY` | Secret for admin registration. Random, at least 32 characters, different from `JWT_SECRET` |
-| `APP_URL` | Base URL used in emailed links, including the port and with no trailing slash |
+| `APP_URL` | Base URL used in emailed links, with no trailing slash. Locally it includes the port (`http://localhost:3000`). In production it is the public URL with no port |
 | `RESEND_API_KEY` | Resend API key |
 | `EMAIL_FROM` | Sender address for outgoing email |
-| `CORS_ORIGINS` | Comma-separated list of allowed browser origins |
+| `CORS_ORIGINS` | Comma-separated list of allowed browser origins, with no trailing slashes |
 
 Generate secrets with:
 
@@ -82,13 +91,27 @@ Generate secrets with:
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
+## Deployment
+
+The API is deployed as a Render web service, with its database on Neon.
+
+- **Build command:** `npm install`
+- **Start command:** `npm start`
+- **Database:** create the tables once by running `db/schema.sql` against Neon. Use Neon's direct connection string for that one-off step, and the pooled connection string as `DATABASE_URL` for the running app.
+- **Environment variables:** set every variable in the table above in Render's environment settings, except `PORT`. Use new production secrets for `JWT_SECRET` and `ADMIN_SECRET_KEY`, never the local ones.
+- **Proxy:** the app sets `app.set('trust proxy', 1)` so rate limits see each visitor's real IP behind Render's proxy.
+- **URLs:** `APP_URL` and `CORS_ORIGINS` must match the public Render URL, without a trailing slash.
+
+Variable names are case-sensitive on Render (Linux), so `DATABASE_URL` and `database_url` are different names.
+
 ## API documentation
 
-Interactive documentation is served by Swagger UI while the server runs:
+Interactive documentation is served by Swagger UI by the running server:
 
-**http://localhost:3000/api-docs**
+- **Live:** https://ecomm-auth-api-0312.onrender.com/api-docs
+- **Local:** http://localhost:3000/api-docs
 
-It is generated from [`openapi.yaml`](./openapi.yaml) in the project root. Every route is documented with its request fields, the status codes it really returns, and fake example data. The docs describe the API only; they do not host it.
+It is generated from [`openapi.yaml`](./openapi.yaml) in the project root. Every route is documented with its request fields, the status codes it really returns, and fake example data. The page lists both servers, so use the **Servers** dropdown to choose local or live. The docs describe the API only; they do not host it.
 
 ### Trying a protected route in Swagger UI
 
@@ -144,18 +167,19 @@ Protected routes expect `Authorization: Bearer <token>`.
 - **Admin registration** needs a secret key sent in a header. The key is checked before the body is read, compared with `crypto.timingSafeEqual` on SHA-256 hashes, and every failure returns the same 401.
 - **Fail-fast configuration.** The server will not start without `JWT_SECRET` or `ADMIN_SECRET_KEY`, or if they are too short.
 - **JWT payload** holds only `id` and `role`. Roles are read from the verified token, never from the request body.
-- **Rate limiting** counts per IP, not per account, so an attacker cannot lock a real user out. Login counts only failed attempts.
+- **Rate limiting** counts per IP, not per account, so an attacker cannot lock a real user out. Login counts only failed attempts. `trust proxy` is set so the count uses the real client IP behind Render.
 - **Headers and CORS.** `helmet` sets security headers. CORS allows only listed origins, and unlisted origins get no permission header.
 - **Parameterized queries** everywhere, and 500 responses never expose error details.
+- **Secrets stay out of git.** `.env` is ignored, production secrets live only in Render's environment settings, and the database connection string is never committed.
 
 The reasoning behind each decision is in [NOTES.md](./NOTES.md).
 
 ## Known limits
 
 - **Email delivery:** until a sending domain is verified in Resend, mail can only be delivered to the account owner's own address. Other users will register but not receive a verification email.
+- **Cold starts:** the free Render web service sleeps when idle, and the free Neon database suspends its compute after a few minutes of inactivity. The first request after a quiet period can be slow.
+- **Free-tier limits:** both hosts change their free plans from time to time, so check their current limits before relying on this deployment long term.
 - **Rate limit storage** is in memory, so counts reset on restart and are not shared between multiple server instances.
-- **Behind a proxy** (Render, Railway and similar), `trust proxy` must be set so limits see real client IPs. This is not configured yet.
-- **API docs server list:** `openapi.yaml` only lists `http://localhost:3000`. A production server entry will be added after deployment.
 - **No automated tests yet.** Routes were tested manually with Postman, `curl` and Swagger UI.
 - **Out of scope:** products, carts, orders, refresh tokens and logout.
 
