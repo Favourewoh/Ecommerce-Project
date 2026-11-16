@@ -39,11 +39,11 @@ const register = async (req, res) => {
     const newUser = result.rows[0];
 
     // Send the verification email using Resend
-    await sendVerificationEmail(sanitizedData.email, rawToken);
+    await sendVerificationEmail( sanitizedData.email, rawToken);
 
     return res.status(201).json({
       message: "User registered successfully!",
-      user: newUser,
+      user: newUser
     });
   } catch (err) {
     if (err.code === "23505") {
@@ -209,6 +209,7 @@ const resendVerification = async (req, res) => {
   }
 };
 
+// login
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -242,7 +243,7 @@ const login = async (req, res) => {
     // checking if the user exists
 
     if (result.rows.length === 0) {
-      return res.status(401).json({ message: "Invalid email or password!" });
+      return res.status(401).json({ message: "Incorrect email or password!" });
     }
 
     const user = result.rows[0];
@@ -357,7 +358,8 @@ const forgotPassword = async (req, res) => {
 // reset password controller
 const resetPassword = async (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const { newPassword } = req.body;
+    const token = req.query.token;
 
     // confirm data type and presence
     if (typeof token !== "string" || typeof newPassword !== "string") {

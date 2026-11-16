@@ -1,0 +1,213 @@
+openapi: 3.0.3
+info:
+  title: Ecommerce Auth API
+  version: 1.0.0
+  description: A REST API for authentication and role-based access control, built with Node.js, Express and PostgreSQL. It handles sign-up, email verification, login, password reset and secret-key admin registration, protected by hashed tokens and rate limiting. It covers accounts and roles only, with no products, cart or orders.
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://my-app.iamworkingonit.com
+    description: Production
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Register a new merchant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - email
+              properties:
+                first_name:
+                  type: string
+                  example: Ada
+                last_name:
+                  type: string
+                  example: Obi
+                email:
+                  type: string
+                  example: johndoe@example.com
+                phone_number:
+                  type: string
+                  example: 08112345678
+                password:
+                  type: string
+                  example: 12345678
+      responses:
+        '201':
+          description: User created
+        '400':
+          description: Missing or invalid fields
+        '409':
+          description: An account with this email address already exists.
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/login:
+    post:
+      summary: Allows user access their account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  example: johndoe@example.com
+                password:
+                  type: string
+                  example: 12345678
+      responses:
+        '200':
+          description: User logged in
+        '400':
+          description: Missing or invalid fields
+        '401':
+          description: Incorrect email or password
+        '403':
+          description: Email needs to be verified before logging in
+        '500':
+          description: Internal server error
+    
+  /api/v1/auth/verify-email:
+    get:
+      summary: Verify user email with created token
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema:
+            type: string
+          description: User email verification token
+          example: 6916932cf00f43d1871a1d2f73d09907200fa93fa1dd1777ca7d092b4d17a9ef
+      responses:
+        '200':
+          description: Email verification successful
+        '400':
+          description: Invalid request. Verification token is required! or  Invalid or expired link
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/forgot-password:
+    post:
+      summary: Allow user reset forgotten password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  example: johndoe@example.com
+      responses:
+        '200':
+          description: Successful request
+        '400':
+          description: Missing or invalid fields
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/reset-password:
+    post:
+      summary: Allow user to update a new password
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema:
+            type: string
+          description: password reset token
+          example: 6916932cf00f43d1871a1d2f73d09907200fa93fa1dd1777ca7d092b4d17a9ef
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newPassword
+              properties:
+                newPassword:
+                  type: string
+                  example: 12345678
+      responses:
+        '200':
+          description: Successful request
+        '400':
+          description: Invalid input or Token
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/resend-verification:
+    post:
+      summary: Allows user to retry email verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  example: johndoe@example.com
+      responses:
+        '200':
+          description: Successful request
+        '400':
+          description: Missing or invalid fields
+        '500':
+          description: Internal server error
+
+  /api/v1/dashboard/user:
+    get:
+      summary: Shows user dashboard. Log in first to get token required for authorization
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful request
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Logged in, but not allowed here
+
+  /api/v1/dashboard/admin:
+    get:
+      summary: Shows admin dashboard. Log in first to get token required for authorization
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successful request
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Logged in, but not allowed here
+
+components:
+  securitySchemes:
+    adminSecret:
+      type: apiKey
+      in: header
+      name: x-admin-secret
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

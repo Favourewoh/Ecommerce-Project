@@ -9,23 +9,25 @@ A REST API for authentication and role-based access control, built with Node.js,
 - **Auth:** `bcrypt` (password hashing), `jsonwebtoken` (JWT, HS256)
 - **Security:** `helmet`, `cors` (origin allowlist), `express-rate-limit`
 - **Email:** Resend
+- **API docs:** OpenAPI 3.0.3 (`openapi.yaml`), served with `swagger-ui-express` and `yaml`
 - **Dev tools:** `nodemon`, Postman for manual testing
 
 ## Project structure
 
 ```
 ecomm-project/
-├── index.js                     # app setup, middleware, router mounting, dashboard routes
+├── index.js                     # app setup, middleware, router mounting, Swagger UI
+├── openapi.yaml                 # API documentation (OpenAPI spec, hand-written)
 ├── db/
 │   ├── index.js                 # pg Pool, exports { query }
-│   └── schema.sql               # users table and indexes   <!-- CHECK path -->
-├── routes/auth.js            
+│   └── schema.sql               # users table and indexes
+├── routes/
 │   ├── auth.js                  # auth URLs and the middleware that runs before each handler
-│   ├── dashboard.js             # dashboard URLs and the middleware that runs before each handler
+│   └── dashboard.js             # dashboard URLs and the middleware that runs before each handler
 ├── controllers/
 │   ├── authController.js        # handler logic
-│   ├── dashboardController.js   # handler logic
-├── middleware/               
+│   └── dashboardController.js   # handler logic
+├── middleware/
 │   ├── auth.js                  # authenticateToken
 │   ├── authorize.js             # authorizeRoles
 │   └── limiter.js               # rate limiters
@@ -80,19 +82,42 @@ Generate secrets with:
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
+## API documentation
+
+Interactive documentation is served by Swagger UI while the server runs:
+
+**http://localhost:3000/api-docs**
+
+It is generated from [`openapi.yaml`](./openapi.yaml) in the project root. Every route is documented with its request fields, the status codes it really returns, and fake example data. The docs describe the API only; they do not host it.
+
+### Trying a protected route in Swagger UI
+
+1. Open `POST /api/v1/auth/login`, press **Try it out**, and log in with a verified account. Copy the token from the response.
+2. Press **Authorize** at the top of the page.
+3. Under `bearerAuth`, paste the token (only the token, Swagger adds the word `Bearer`) and confirm.
+4. Call a dashboard route. The token is now sent automatically.
+
+For `POST /api/v1/auth/admin-register`, enter the admin key under `adminSecret` in the same **Authorize** dialog. It is sent in the `x-admin-secret` header.
+
+Use fake data when trying routes, and never paste a real production key or token into the docs page.
+
+### Keeping the docs accurate
+
+When a route's status codes, fields or messages change, update `openapi.yaml` in the same commit. The docs are only useful while they match the code.
+
 ## Endpoints
 
-All auth routes are under `/api/v1/auth`.
+Auth routes are under `/api/v1/auth`. Dashboard routes are under `/api/v1/dashboard`.
 
 | Method | Path | Who can call it | What it does |
 |---|---|---|---|
-| POST | `/register` | Anyone | Creates a `merchant` account and emails a verification link |
-| POST | `/admin-register` | Anyone with the `x-admin-secret` header; limited to 5 requests per 15 minutes per IP | Creates an `admin` account. Admins also verify by email |
-| GET | `/verify-email?token=...` | Anyone with a valid link | Marks the account verified. A link works once |
-| POST | `/login` | Anyone; limited to 10 failed attempts per 15 minutes per IP | Returns a JWT for a verified account |
-| POST | `/forgot-password` | Anyone; limited to 3 requests per 15 minutes per IP | Sends a reset link. Same response whether or not the account exists |
-| POST | `/reset-password` | Anyone with a valid reset token | Sets a new password. The token works once |
-| POST | `/resend-verification` | Anyone; limited to 3 requests per 15 minutes per IP | Sends a new verification link to an unverified account. Same response in every case |
+| POST | `/api/v1/auth/register` | Anyone | Creates a `merchant` account and emails a verification link |
+| POST | `/api/v1/auth/admin-register` | Anyone with the `x-admin-secret` header; limited to 5 requests per 15 minutes per IP | Creates an `admin` account. Admins also verify by email |
+| GET | `/api/v1/auth/verify-email?token=...` | Anyone with a valid link | Marks the account verified. A link works once |
+| POST | `/api/v1/auth/login` | Anyone; limited to 10 failed attempts per 15 minutes per IP | Returns a JWT for a verified account |
+| POST | `/api/v1/auth/forgot-password` | Anyone; limited to 3 requests per 15 minutes per IP | Sends a reset link. Same response whether or not the account exists |
+| POST | `/api/v1/auth/reset-password` | Anyone with a valid reset token | Sets a new password. The token works once |
+| POST | `/api/v1/auth/resend-verification` | Anyone; limited to 3 requests per 15 minutes per IP | Sends a new verification link to an unverified account. Same response in every case |
 | GET | `/api/v1/dashboard/user` | Any logged-in user (`authenticateToken`) | Returns the caller's id and role |
 | GET | `/api/v1/dashboard/admin` | Admins only (`authenticateToken`, then `authorizeRoles("admin")`) | Admin-only test route |
 
@@ -130,7 +155,8 @@ The reasoning behind each decision is in [NOTES.md](./NOTES.md).
 - **Email delivery:** until a sending domain is verified in Resend, mail can only be delivered to the account owner's own address. Other users will register but not receive a verification email.
 - **Rate limit storage** is in memory, so counts reset on restart and are not shared between multiple server instances.
 - **Behind a proxy** (Render, Railway and similar), `trust proxy` must be set so limits see real client IPs. This is not configured yet.
-- **No automated tests yet.** Routes were tested manually with Postman and `curl`.
+- **API docs server list:** `openapi.yaml` only lists `http://localhost:3000`. A production server entry will be added after deployment.
+- **No automated tests yet.** Routes were tested manually with Postman, `curl` and Swagger UI.
 - **Out of scope:** products, carts, orders, refresh tokens and logout.
 
 ## Author

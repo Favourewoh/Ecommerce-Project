@@ -8,7 +8,7 @@ const { RegisterLimiter, loginLimiter, forgotPasswordLimiter, resendVerification
 router.post('/admin-register', RegisterLimiter , authController.adminRegister);
 
 // merchant registration route
-router.post("/register", RegisterLimiter, authController.register)
+router.post("/register", authController.register)
 
 // verifying email router
 router.get("/verify-email", authController.emailVerification);

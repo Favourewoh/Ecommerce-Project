@@ -27,6 +27,8 @@ const sendVerificationEmail = async(email, rawToken) => {
     const subject = "Verify your email address";
     const text = `Please verify your account by clicking the following link: ${verificationUrl}`;
 
+
+
     return await sendEmail({
         to: email,
         subject,
