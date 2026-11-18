@@ -47,6 +47,46 @@ paths:
           description: An account with this email address already exists.
         '500':
           description: Internal server error
+  /api/v1/auth/admin-register:
+    post:
+      summary: Register a admin users
+      security:
+        - adminSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - first_name
+                - last_name
+                - email
+              properties:
+                first_name:
+                  type: string
+                  example: Ada
+                last_name:
+                  type: string
+                  example: Obi
+                email:
+                  type: string
+                  example: johndoe@example.com
+                phone_number:
+                  type: string
+                  example: 08112345678
+                password:
+                  type: string
+                  example: 12345678
+      responses:
+        '201':
+          description: User created
+        '400':
+          description: Missing or invalid fields
+        '409':
+          description: An account with this email address already exists.
+        '500':
+          description: Internal server error
 
   /api/v1/auth/login:
     post:

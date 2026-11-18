@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 // CRITICAL BOOT CHECKS
-if (!process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET_KEY.length < 32 || !process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || !process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+if (!process.env.ADMIN_SECRET_KEY || process.env.ADMIN_SECRET_KEY.length < 32 || !process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || !process.env.SMTP_USER || !process.env.SMTP_HOST || !process.env.SMTP_PASS) {
   throw new Error("Admin key is missing or too short, or JWT secret is missing or too short, or resend API key or email from is missing")
 }
 

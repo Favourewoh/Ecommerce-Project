@@ -5,8 +5,9 @@ const uniformAuthError = { message: "Access denied. Invalid secret key." };
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
+const {sendPasswordResetEmail} = require('../utils/mailer');
 const {sendVerificationEmail} = require('../utils/mailer');
-const { raw } = require('express');
+
 
 // merchant register controller
 const register = async (req, res) => {
@@ -99,8 +100,8 @@ const adminRegister = async (req, res) => {
 
     const newUser = result.rows[0];
 
-    // Send the verification email using Resend (email placeholder because domain is unverified)
-    await sendVerificationEmail("favourewoh99@gmail.com", rawToken);
+    // Send the verification email using nodemailer
+    await sendVerificationEmail(sanitizedData.email, rawToken);
 
     // return success response
     return res.status(201).json({
@@ -197,9 +198,9 @@ const resendVerification = async (req, res) => {
     const result = await db.query(updateQuery, [tokenHash, cleanedEmail]);
 
     // Security: If a user was found and updated, send the email. 
-    // Either way, return the exact same generic success message to prevent email enumeration.(email placeholder because domain is unverified)
+    // Either way, return the exact same generic success message to prevent email enumeration.
     if (result.rows.length > 0) {
-      await sendVerificationEmail("favourewoh99@gmail.com", rawToken);
+      await sendVerificationEmail(cleanedEmail, rawToken);
     }
 
     return res.status(200).json({
@@ -344,11 +345,8 @@ const forgotPassword = async (req, res) => {
       return res.status(200).json(genericReponseMessage);
     }
 
-    //Printing reset link to terminal for testing
-    const appUrl = process.env.APP_URL;
-    const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
-
-    console.log(resetUrl);
+    
+    await sendPasswordResetEmail( "favourewoh99@gmail.com", rawToken);
 
     return res.status(200).json(genericReponseMessage);
   } catch (err) {

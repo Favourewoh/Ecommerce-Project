@@ -15,7 +15,7 @@ The free web service sleeps when idle, so the first request after a quiet period
 - **Database:** PostgreSQL, raw SQL through `pg` (no ORM)
 - **Auth:** `bcrypt` (password hashing), `jsonwebtoken` (JWT, HS256)
 - **Security:** `helmet`, `cors` (origin allowlist), `express-rate-limit`
-- **Email:** Resend
+- **Email:** Nodemailer, sending through Gmail SMTP
 - **API docs:** OpenAPI 3.0.3 (`openapi.yaml`), served with `swagger-ui-express` and `yaml`
 - **Hosting:** Render (API), Neon (PostgreSQL)
 - **Dev tools:** `nodemon`, Postman for manual testing
@@ -42,7 +42,7 @@ ecomm-project/
 ├── utils/
 │   ├── authHelpers.js           # validation, password hashing, verification tokens
 │   ├── security.js              # admin key check (timing-safe)
-│   └── mailer.js                # sendEmail, sendVerificationEmail
+│   └── mailer.js                # sendEmail, sendVerificationEmail (Nodemailer)
 ├── .env.example                 # variable names only
 └── NOTES.md                     # design decisions in my own words
 ```
@@ -81,8 +81,11 @@ Names only. Never commit real values.
 | `JWT_EXPIRES_IN` | Token lifetime, for example `1h` |
 | `ADMIN_SECRET_KEY` | Secret for admin registration. Random, at least 32 characters, different from `JWT_SECRET` |
 | `APP_URL` | Base URL used in emailed links, with no trailing slash. Locally it includes the port (`http://localhost:3000`). In production it is the public URL with no port |
-| `RESEND_API_KEY` | Resend API key |
-| `EMAIL_FROM` | Sender address for outgoing email |
+| `SMTP_HOST` | SMTP server host, `smtp.gmail.com` for Gmail |
+| `SMTP_PORT` | SMTP port: `465` (secure connection from the start) or `587` (upgrades after connecting) |
+| `SMTP_USER` | The Gmail address used to send. Use a dedicated account for this project, not a personal one |
+| `SMTP_PASS` | A Gmail **app password** (needs 2-step verification), never the normal account password |
+| `EMAIL_FROM` | Sender address. With Gmail it must be the same address as `SMTP_USER`, because Gmail overrides a different sender |
 | `CORS_ORIGINS` | Comma-separated list of allowed browser origins, with no trailing slashes |
 
 Generate secrets with:
@@ -101,6 +104,7 @@ The API is deployed as a Render web service, with its database on Neon.
 - **Environment variables:** set every variable in the table above in Render's environment settings, except `PORT`. Use new production secrets for `JWT_SECRET` and `ADMIN_SECRET_KEY`, never the local ones.
 - **Proxy:** the app sets `app.set('trust proxy', 1)` so rate limits see each visitor's real IP behind Render's proxy.
 - **URLs:** `APP_URL` and `CORS_ORIGINS` must match the public Render URL, without a trailing slash.
+- **Email:** the `SMTP_*` variables and `EMAIL_FROM` are set in Render like any other secret. Some hosts block outbound SMTP ports (25, 465, 587), including on free plans, so check Render's current policy. If SMTP is blocked, mail works locally and fails after deployment (see Known limits).
 
 Variable names are case-sensitive on Render (Linux), so `DATABASE_URL` and `database_url` are different names.
 
@@ -170,13 +174,15 @@ Protected routes expect `Authorization: Bearer <token>`.
 - **Rate limiting** counts per IP, not per account, so an attacker cannot lock a real user out. Login counts only failed attempts. `trust proxy` is set so the count uses the real client IP behind Render.
 - **Headers and CORS.** `helmet` sets security headers. CORS allows only listed origins, and unlisted origins get no permission header.
 - **Parameterized queries** everywhere, and 500 responses never expose error details.
+- **Email credentials** are a Gmail app password in a dedicated account, stored only in environment variables. A failed send is logged, and never fails registration.
 - **Secrets stay out of git.** `.env` is ignored, production secrets live only in Render's environment settings, and the database connection string is never committed.
 
 The reasoning behind each decision is in [NOTES.md](./NOTES.md).
 
 ## Known limits
 
-- **Email delivery:** until a sending domain is verified in Resend, mail can only be delivered to the account owner's own address. Other users will register but not receive a verification email.
+- **Email delivery:** mail is sent through a Gmail account over SMTP, which suits a demo with a handful of users, not production volume. Gmail has its own sending limits, and the sender is a Gmail address, not a custom domain.
+- **SMTP on the host:** if the host blocks outbound SMTP ports, verification emails will not leave the deployed app. Registration still succeeds (201) and the error is logged, but users cannot verify by email until the host allows SMTP or the app switches to an email provider that uses an HTTPS API.
 - **Cold starts:** the free Render web service sleeps when idle, and the free Neon database suspends its compute after a few minutes of inactivity. The first request after a quiet period can be slow.
 - **Free-tier limits:** both hosts change their free plans from time to time, so check their current limits before relying on this deployment long term.
 - **Rate limit storage** is in memory, so counts reset on restart and are not shared between multiple server instances.

@@ -1,25 +1,28 @@
-const { Resend } = require('resend');
+const nodemailer = require("nodemailer");
 
-// starting up resend with my API key
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Create a transporter using SMTP
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false, 
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 // creating a function to send emails and also catch unsucessful runs
-
-const sendEmail = async ({ to, subject, text}) => {
-    const {data, error} = await resend.emails.send({
-        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-        to,
-        subject,
-        text
+const sendEmail = async ({ to, subject, text }) => {
+  await transporter.sendMail({ 
+    from: process.env.EMAIL_FROM, 
+    to, 
+    subject, 
+    text 
     });
-
-    if(error) {
-        throw new Error (`Resend error: ${error.message}`);
-    };
-
-    return data;
 };
+
+
+// creating a function to send emails and also catch unsucessful runs
 
 // now to build the verification link and trigger sendEmail
 const sendVerificationEmail = async(email, rawToken) => {
@@ -36,7 +39,23 @@ const sendVerificationEmail = async(email, rawToken) => {
     });
 };
 
+// Password reset mail
+const sendPasswordResetEmail = async(email, rawToken) => {
+    const resetUrl = `${process.env.APP_URL}/reset-password?token=${rawToken}`;
+    const subject = "Reset your password";
+    const text = `Please verify your account by clicking the following link: ${resetUrl}`;
+
+
+
+    return await sendEmail({
+        to: email,
+        subject,
+        text
+    });
+};
+
 module.exports = {
     sendEmail,
-    sendVerificationEmail
+    sendVerificationEmail,
+    sendPasswordResetEmail
 };
